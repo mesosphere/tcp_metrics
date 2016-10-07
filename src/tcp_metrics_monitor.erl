@@ -35,7 +35,6 @@ start_link() ->
     {stop, Reason :: term()} | ignore).
 init([]) ->
     process_flag(trap_exit, true),
-    erlang:send_after(splay_ms(), self(), poll_proc),
     {ok, #state{}}.
 
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
@@ -60,17 +59,6 @@ handle_cast(_Request, State) ->
     {noreply, NewState :: #state{}} |
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(poll_proc, State) ->
-    ProcFile = ip_vs_conn_config:proc_file(),
-    New = ip_vs_conn:fold(
-              fun(Conn, Map) -> 
-                      ip_vs_conn_map:update(State#state.syns, Conn, Map)
-              end,
-              maps:new(),
-              ProcFile),
-    NewState = State#state{syns = New},
-    erlang:send_after(splay_ms(), self(), poll_proc),
-    {noreply, NewState};
    
 handle_info(_Info, State) ->
     {noreply, State}.
