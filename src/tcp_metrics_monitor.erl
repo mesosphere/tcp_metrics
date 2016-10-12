@@ -23,16 +23,6 @@
 
 -define(SERVER, ?MODULE).
 
-%% -define(GENL_ID_GENERATE    ,0).
-%% -define(GENL_ID_CTRL        ,NETLINK_GENERIC).
-%% -define(GENL_ID_VFS_DQUOT   ,(NETLINK_GENERIC + 1)).
-%% -define(GENL_ID_PMCRAID     ,(NETLINK_GENERIC + 2)).
-%% -define(NLM_F_ROOT          ,16#100).    %% specify tree    root
-%% -define(NLM_F_MATCH         ,16#200).    %% return all matching
-%% -define(NLM_F_ATOMIC        ,16#400).    %% atomic GET
-%% -define(NLM_F_DUMP          ,(NLM_F_ROOT|NLM_F_MATCH)).
-
-
 -record(state, {
         socket :: integer(),
         family :: integer()
@@ -49,9 +39,7 @@ start_link() ->
     {stop, Reason :: term()} | ignore).
 init([]) ->
     process_flag(trap_exit, true),
-    ct:pal("init tcp_metrics_monitor"),
     {ok, Socket} = procket:socket(netlink, dgram, ?NETLINK_GENERIC),
-    ct:pal("init procket:open"),
     {ok, Family} = get_family(Socket),
     ct:pal("init get_family ~p", [Family]),
     {ok, #state{socket = Socket, family = Family}}.
@@ -64,21 +52,13 @@ get_family(Socket) ->
     Flags = [ack, request],
     Payload = #getfamily{request = [{family_name, "tcp_metrics"}]},
     Msg = {netlink, ctrl, Flags, Seq, Pid, Payload},
-    Out = netlink_codec:nl_enc(generic, Msg),
-    ct:pal("getfamily encoded ~p", [Out]),
-    ok = procket:sendto(Socket, Out),
-    ct:pal("getfamily sent!"),
-    Rsp = procket:recv(Socket, 4*1024),
-    ct:pal("getfamily response ~p", [Rsp]),
-    case Rsp of
-        {ok, Msg} ->
-            Decoded = netlink_codec:nl_dec(?NETLINK_GENERIC, Msg),
-            ct:pal("getfamily decoded ~p", [Decoded]),
-            Decoded;
-        Err ->
-            ct:pal("getfamily error ~p", [Err]),
-            Err
-    end.
+    Data = netlink_codec:nl_enc(generic, Msg),
+    ok = procket:sendto(Socket, Data),
+    {ok, Rsp} = procket:recv(Socket, 4*1024),
+    Decoded = netlink_codec:nl_dec(?NETLINK_GENERIC, Rsp),
+    [{netlink,ctrl,_,Seq,_,{newfamily,_,_, Attrs}}] = Decoded,
+    {family_id, Family} = lists:keyfind(family_id, 1, Attrs),
+    {ok, Family}.
 
 %% -spec(request_metrics(Pid :: integer(), Seq :: integer(), Socket :: gen_socket:socket()) -> ok | {error, term()}).
 %request_metrics(Pid, Seq, Socket) ->
