@@ -53,7 +53,7 @@ init([]) ->
     {ok, Socket} = procket:socket(netlink, dgram, ?NETLINK_GENERIC),
     ct:pal("init procket:open"),
     {ok, Family} = get_family(Socket),
-    ct:pal("init get_family"),
+    ct:pal("init get_family ~p", [Family]),
     {ok, #state{socket = Socket, family = Family}}.
 
 -spec(get_family(integer()) -> {ok, integer()} | {error, term() | string() | binary()}).
@@ -71,10 +71,14 @@ get_family(Socket) ->
     Rsp = procket:recv(Socket, 4*1024),
     ct:pal("getfamily response ~p", [Rsp]),
     case Rsp of
-        {ok, Msg} -> netlink_codec:nl_dec(Msg);
-        Err -> Err
+        {ok, Msg} ->
+            Decoded = netlink_codec:nl_dec(?NETLINK_GENERIC, Msg),
+            ct:pal("getfamily decoded ~p", [Decoded]),
+            Decoded;
+        Err ->
+            ct:pal("getfamily error ~p", [Err]),
+            Err
     end.
-
 
 %% -spec(request_metrics(Pid :: integer(), Seq :: integer(), Socket :: gen_socket:socket()) -> ok | {error, term()}).
 %request_metrics(Pid, Seq, Socket) ->
