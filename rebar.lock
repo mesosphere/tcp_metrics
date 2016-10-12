@@ -13,7 +13,7 @@
  {<<"gen_socket">>,
   {git,"git://github.com/dcos/gen_socket",
        {ref,"2dc7f213d62b44a7bcc3202c7cd9094b2878d329"}},
-  1},
+  0},
  {<<"goldrush">>,
   {git,"git://github.com/DeadZen/goldrush.git",
        {ref,"212299233c7e7eb63a97be2777e1c05ebaa58dbe"}},

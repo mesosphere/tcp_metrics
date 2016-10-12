@@ -50,11 +50,13 @@ start_link() ->
     {stop, Reason :: term()} | ignore).
 init([]) ->
     process_flag(trap_exit, true),
-    {ok, Socket} = gen_socket:socket(netlink, raw, ?NETLINK_NETFILTER, []),
-    ok = gen_socket:bind(Socket, netlink:sockaddr_nl(netlink, 0, 0)),
-    ok = gen_socket:setsockopt(Socket, ?SOL_SOCKET, ?SO_RCVBUF, 1024*1024),
-    netlink:rcvbufsiz(Socket, 1024*1024),
+    ct:pal("init tcp_metrics_monitor"),
+    {ok, Socket} = gen_socket:socket(netlink, raw, ?NETLINK_NETFILTER),
+    ct:pal("init socket"),
+    ok = gen_socket:setsockopt(Socket, ?SOL_SOCKET, ?SO_RCVBUF, 64*1024),
+    ct:pal("init setsockopt"),
     {ok, Family} = get_family(Socket),
+    ct:pal("init get_family"),
     %% {gen_socket, RealPort, _, _, _, _} = Socket,
     %% ok = gen_socket:input_event(Socket, true),
     %% erlang:send_after(splay_ms(), self(), poll_tcp_metrics),
@@ -63,13 +65,16 @@ init([]) ->
 
 -spec(get_family(gen_socket:socket()) -> {ok, integer()} | {error, term() | string() | binary()}).
 get_family(Socket) ->
+    ct:pal("get_family"),
     Pid = 0,
     Seq = erlang:unique_integer([positive]),
     Flags = [ack, request],
     Payload = #getfamily{request = [{family_name, "tcp_metrics"}]},
     Msg = {netlink, ctrl, Flags, Seq, Pid, Payload},
     Out = netlink_codec:nl_enc(generic, Msg),
+    ct:pal("encoded ~p", [Out]),
     ok = gen_socket:send(Socket, Out),
+    ct:pal("sent!"),
     case gen_socket:recv(Socket) of
         {ok, Msg} -> {ok, netlink_codec:nl_dec(Msg)};
         _ -> {error, get_family}
