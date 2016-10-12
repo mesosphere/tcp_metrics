@@ -51,10 +51,8 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
     ct:pal("init tcp_metrics_monitor"),
-    {ok, Socket} = gen_socket:socket(netlink, raw, ?NETLINK_NETFILTER),
-    ct:pal("init socket"),
-    ok = gen_socket:setsockopt(Socket, ?SOL_SOCKET, ?SO_RCVBUF, 64*1024),
-    ct:pal("init setsockopt"),
+    {ok, Socket} = procket:open(0, [{family, netlink}, {type, raw}, {protocol,  ?NETLINK_NETFILTER}]),
+    ct:pal("init procket:open"),
     {ok, Family} = get_family(Socket),
     ct:pal("init get_family"),
     %% {gen_socket, RealPort, _, _, _, _} = Socket,
@@ -72,12 +70,14 @@ get_family(Socket) ->
     Payload = #getfamily{request = [{family_name, "tcp_metrics"}]},
     Msg = {netlink, ctrl, Flags, Seq, Pid, Payload},
     Out = netlink_codec:nl_enc(generic, Msg),
-    ct:pal("encoded ~p", [Out]),
-    ok = gen_socket:send(Socket, Out),
-    ct:pal("sent!"),
+    ct:pal("getfamily encoded ~p", [Out]),
+    ok = procket:sendto(Socket, Out),
+    ct:pal("getfamily sent!"),
+    Rsp = procket:recv(Socket),
+    ct:pal("getfamily response ~p", [Rsp]),
     case gen_socket:recv(Socket) of
         {ok, Msg} -> {ok, netlink_codec:nl_dec(Msg)};
-        _ -> {error, get_family}
+        Err -> Err
     end.
 
 
