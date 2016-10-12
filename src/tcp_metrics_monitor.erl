@@ -10,7 +10,6 @@
 -author("Anatoly Yakovenko").
 
 -behaviour(gen_server).
--include_lib("gen_socket/include/gen_socket.hrl").
 -include_lib("gen_netlink/include/netlink.hrl").
 
 -export([start_link/0]).
@@ -35,7 +34,7 @@
 
 
 -record(state, {
-        socket :: gen_socket:socket(),
+        socket :: integer(),
         family :: integer()
     }).
 
@@ -55,13 +54,9 @@ init([]) ->
     ct:pal("init procket:open"),
     {ok, Family} = get_family(Socket),
     ct:pal("init get_family"),
-    %% {gen_socket, RealPort, _, _, _, _} = Socket,
-    %% ok = gen_socket:input_event(Socket, true),
-    %% erlang:send_after(splay_ms(), self(), poll_tcp_metrics),
-    %% erlang:link(RealPort),
     {ok, #state{socket = Socket, family = Family}}.
 
--spec(get_family(gen_socket:socket()) -> {ok, integer()} | {error, term() | string() | binary()}).
+-spec(get_family(integer()) -> {ok, integer()} | {error, term() | string() | binary()}).
 get_family(Socket) ->
     ct:pal("get_family"),
     Pid = 0,
@@ -75,7 +70,7 @@ get_family(Socket) ->
     ct:pal("getfamily sent!"),
     Rsp = procket:recv(Socket),
     ct:pal("getfamily response ~p", [Rsp]),
-    case gen_socket:recv(Socket) of
+    case Rsp of
         {ok, Msg} -> {ok, netlink_codec:nl_dec(Msg)};
         Err -> Err
     end.
@@ -128,7 +123,7 @@ handle_info(_Info, State) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
 terminate(_Reason, _State = #state{socket = Socket}) ->
-    gen_socket:close(Socket),
+    procket:close(Socket),
     ok.
 
 -spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
