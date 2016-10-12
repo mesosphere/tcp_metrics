@@ -50,7 +50,7 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
     ct:pal("init tcp_metrics_monitor"),
-    {ok, Socket} = procket:open(0, [{family, netlink}, {type, raw}, {protocol,  ?NETLINK_NETFILTER}]),
+    {ok, Socket} = procket:socket(netlink, dgram, ?NETLINK_GENERIC),
     ct:pal("init procket:open"),
     {ok, Family} = get_family(Socket),
     ct:pal("init get_family"),
@@ -68,10 +68,10 @@ get_family(Socket) ->
     ct:pal("getfamily encoded ~p", [Out]),
     ok = procket:sendto(Socket, Out),
     ct:pal("getfamily sent!"),
-    Rsp = procket:recv(Socket),
+    Rsp = procket:recv(Socket, 4*1024),
     ct:pal("getfamily response ~p", [Rsp]),
     case Rsp of
-        {ok, Msg} -> {ok, netlink_codec:nl_dec(Msg)};
+        {ok, Msg} -> netlink_codec:nl_dec(Msg);
         Err -> Err
     end.
 
