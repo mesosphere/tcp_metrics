@@ -65,11 +65,13 @@ get_family(Socket) ->
 get_metrics(Family, Socket) ->
     Pid = 0,
     Seq = erlang:unique_integer([positive]),
-    Flags = [request, dump],
+    Flags = [?NLM_F_DUMP, request],
     Msg = {netlink, tcp_metrics, Flags, Seq, Pid, {get, 1, 0, []}},
     Data = netlink_codec:nl_enc(Family, Msg),
+    ct:pal("get_metrics sendto ~p", [Data]),
     ok = procket:sendto(Socket, Data),
-    {ok, Rsp} = procket:recv(Socket, 4*1024),
+    {ok, Rsp} = procket:recv(Socket, 64*1024),
+    ct:pal("get_metrics response ~p", [Rsp]),
     Decoded = netlink_codec:nl_dec(Family, Rsp),
     ct:pal("get_metrics decoded ~p", [Decoded]),
     Decoded.
