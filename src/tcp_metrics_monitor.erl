@@ -42,6 +42,7 @@ init([]) ->
     {ok, Socket} = procket:socket(netlink, dgram, ?NETLINK_GENERIC),
     {ok, Family} = get_family(Socket),
     ct:pal("init get_family ~p", [Family]),
+    get_metrics(Family, Socket),
     {ok, #state{socket = Socket, family = Family}}.
 
 -spec(get_family(integer()) -> {ok, integer()} | {error, term() | string() | binary()}).
@@ -56,24 +57,22 @@ get_family(Socket) ->
     ok = procket:sendto(Socket, Data),
     {ok, Rsp} = procket:recv(Socket, 4*1024),
     Decoded = netlink_codec:nl_dec(?NETLINK_GENERIC, Rsp),
-    [{netlink,ctrl,_,Seq,_,{newfamily,_,_, Attrs}}] = Decoded,
+    [#netlink{seq = Seq, msg = {newfamily,_,_, Attrs}}] = Decoded,
     {family_id, Family} = lists:keyfind(family_id, 1, Attrs),
     {ok, Family}.
 
-%% -spec(request_metrics(Pid :: integer(), Seq :: integer(), Socket :: gen_socket:socket()) -> ok | {error, term()}).
-%request_metrics(Pid, Seq, Socket) ->
-%    {gen_socket, RealPort, _, _, _, _} = Socket,
-%    Flags = [ack, request],
-%    Payload = gen_netlink:nl_enc({netlink, generic}, tcp_metrics, {get, 1, 0, 0}),
-%    Msg = {netlink, ctrl, Flags, Seq, Pid, Payload},
-%    ok = gen_socket:sendmsg(Socket, Payload),
-%    receive
-%        {Socket, input_ready} ->
-%            Msg = gen_socket:recvmsg(Socket),
-%            {ok, nl_dec_payload(Msg)}
-%    after
-%        Timeout -> {error, timeout} 
-%    end.
+-spec(get_metrics(Family :: integer(), Socket :: integer()) -> ok | {error, term()}).
+get_metrics(Family, Socket) ->
+    Pid = 0,
+    Seq = erlang:unique_integer([positive]),
+    Flags = [request, dump],
+    Msg = {netlink, tcp_metrics, Flags, Seq, Pid, {get, 1, 0, []}},
+    Data = netlink_codec:nl_enc(Family, Msg),
+    ok = procket:sendto(Socket, Data),
+    {ok, Rsp} = procket:recv(Socket, 4*1024),
+    Decoded = netlink_codec:nl_dec(Family, Rsp),
+    ct:pal("get_metrics decoded ~p", [Decoded]),
+    Decoded.
 
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
     State :: #state{}) ->

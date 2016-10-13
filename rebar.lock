@@ -8,7 +8,7 @@
   1},
  {<<"gen_netlink">>,
   {git,"git@github.com:mesosphere/gen_netlink.git",
-       {ref,"100d0e62e0ce185555502460c48efde882bf097c"}},
+       {ref,"d35a90e51eeb944dbeb8e50a0379b1f7b6ae4af5"}},
   0},
  {<<"gen_socket">>,
   {git,"git://github.com/dcos/gen_socket",
