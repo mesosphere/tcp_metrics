@@ -24,7 +24,6 @@
 -define(SERVER, ?MODULE).
 
 -record(state, {
-        socket :: integer(),
         family :: integer()
     }).
 
@@ -39,14 +38,14 @@ start_link() ->
     {stop, Reason :: term()} | ignore).
 init([]) ->
     process_flag(trap_exit, true),
-    {ok, Socket} = procket:socket(netlink, dgram, ?NETLINK_GENERIC),
-    {ok, Family} = get_family(Socket),
+    {ok, Family} = get_family(),
     ct:pal("init get_family ~p", [Family]),
-    get_metrics(Family, Socket),
-    {ok, #state{socket = Socket, family = Family}}.
+    get_metrics(Family),
+    {ok, #state{family = Family}}.
 
--spec(get_family(integer()) -> {ok, integer()} | {error, term() | string() | binary()}).
-get_family(Socket) ->
+-spec(get_family() -> {ok, integer()} | {error, term() | string() | binary()}).
+get_family() ->
+    {ok, Socket} = procket:socket(netlink, dgram, ?NETLINK_GENERIC),
     ct:pal("get_family"),
     Pid = 0,
     Seq = erlang:unique_integer([positive]),
@@ -54,25 +53,32 @@ get_family(Socket) ->
     Payload = #getfamily{request = [{family_name, "tcp_metrics"}]},
     Msg = {netlink, ctrl, Flags, Seq, Pid, Payload},
     Data = netlink_codec:nl_enc(generic, Msg),
-    ok = procket:sendto(Socket, Data),
-    {ok, Rsp} = procket:recv(Socket, 4*1024),
+    SndRsp = procket:sendto(Socket, Data),
+    RecvRsp = procket:recv(Socket, 4*1024),
+    procket:close(Socket),
+    ok = SndRsp,
+    {ok, Rsp} = RecvRsp,
     Decoded = netlink_codec:nl_dec(?NETLINK_GENERIC, Rsp),
     [#netlink{seq = Seq, msg = {newfamily,_,_, Attrs}}] = Decoded,
     {family_id, Family} = lists:keyfind(family_id, 1, Attrs),
     {ok, Family}.
 
--spec(get_metrics(Family :: integer(), Socket :: integer()) -> ok | {error, term()}).
-get_metrics(Family, Socket) ->
+-spec(get_metrics(Family :: integer()) -> ok | {error, term()}).
+get_metrics(Family) ->
+    {ok, Socket} = procket:socket(netlink, dgram, ?NETLINK_GENERIC),
     Pid = 0,
     Seq = erlang:unique_integer([positive]),
     Flags = [?NLM_F_DUMP, request],
     Msg = {netlink, tcp_metrics, Flags, Seq, Pid, {get, 1, 0, []}},
     Data = netlink_codec:nl_enc(Family, Msg),
     ct:pal("get_metrics sendto ~p", [Data]),
-    ok = procket:sendto(Socket, Data),
-    {ok, Rsp} = procket:recv(Socket, 64*1024),
-    ct:pal("get_metrics response ~p", [Rsp]),
-    Decoded = netlink_codec:nl_dec(Family, Rsp),
+    SndRsp = procket:sendto(Socket, Data),
+    RecvRsp = procket:recv(Socket, 64*1024),
+    procket:close(Socket),
+    ok = SndRsp,
+    {ok, Rsp} = RecvRsp,
+    ct:pal("get_metrics response ~p bytes", [size(Rsp)]),
+    Decoded = netlink_codec:nl_dec(tcp_metrics, Rsp),
     ct:pal("get_metrics decoded ~p", [Decoded]),
     Decoded.
 
@@ -98,8 +104,6 @@ handle_cast(_Request, State) ->
     {noreply, NewState :: #state{}} |
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
-handle_info({Socket, input_ready}, State = #state{socket = Socket}) ->
-    {noreply, State};
 handle_info(poll_tcp_metrics, State) ->
     {noreply, State};
 handle_info(_Info, State) ->
@@ -107,8 +111,7 @@ handle_info(_Info, State) ->
 
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
-terminate(_Reason, _State = #state{socket = Socket}) ->
-    procket:close(Socket),
+terminate(_Reason, _State = #state{}) ->
     ok.
 
 -spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
