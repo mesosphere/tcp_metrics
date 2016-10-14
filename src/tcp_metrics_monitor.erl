@@ -40,7 +40,7 @@ init([]) ->
     process_flag(trap_exit, true),
     {ok, Family} = get_family(),
     ct:pal("init get_family ~p", [Family]),
-    get_metrics(Family),
+    erlang:send_after(splay_ms(), self(), poll_tcp_metrics),
     {ok, #state{family = Family}}.
 
 -spec(get_family() -> {ok, integer()} | {error, term() | string() | binary()}).
@@ -104,7 +104,8 @@ handle_cast(_Request, State) ->
     {noreply, NewState :: #state{}} |
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(poll_tcp_metrics, State) ->
+handle_info(poll_tcp_metrics, State = #state{family = Family}) ->
+    get_metrics(Family),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -121,11 +122,11 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% TODO: borrowed from minuteman, should probably be a util somewhere
-%% -spec(splay_ms() -> integer()).
-%% splay_ms() ->
-%%     MsPerMinute = tcp_metrics_config:interval_seconds() * 1000,
-%%     NextMinute = -1 * erlang:monotonic_time(milli_seconds) rem MsPerMinute,
-%%     SplayMS = tcp_metrics_config:splay_seconds() * 1000,
-%%     FlooredSplayMS = max(1, SplayMS),
-%%     Splay = rand:uniform(FlooredSplayMS),
-%%     NextMinute + Splay.
+-spec(splay_ms() -> integer()).
+splay_ms() ->
+    MsPerMinute = tcp_metrics_config:interval_seconds() * 1000,
+    NextMinute = -1 * erlang:monotonic_time(milli_seconds) rem MsPerMinute,
+    SplayMS = tcp_metrics_config:splay_seconds() * 1000,
+    FlooredSplayMS = max(1, SplayMS),
+    Splay = rand:uniform(FlooredSplayMS),
+    NextMinute + Splay.
