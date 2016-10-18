@@ -2,9 +2,11 @@
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("gen_netlink/include/netlink.hrl").
 
 all() -> [test_gen_server,
-          test_wait].
+          test_wait,
+          test_get_metrics].
 
 test_gen_server(_Config) ->
     erlang:send(tcp_metrics_monitor, hello),
@@ -15,6 +17,21 @@ test_gen_server(_Config) ->
     sys:resume(tcp_metrics_monitor).
 
 test_wait(_Config) -> timer:sleep(2000).
+
+test_get_metrics(_Config) -> test_get_metrics_ci(os:getenv("CI")).
+
+test_get_metrics_ci(false) ->
+    timer:sleep(2000),
+    ct:pal("CI is ~p", [os:getenv("CI")]),
+    {ok, Metrics} = tcp_metrics_monitor:get_metrics(),
+    [H | _] = maps:values(Metrics),
+    ct:pal("got values ~p", [length(maps:values(Metrics))]),
+    [#netlink{type = tcp_metrics} | _] = H;
+
+test_get_metrics_ci(_) ->
+    timer:sleep(2000),
+    ct:pal("CI is ~p", [os:getenv("CI")]),
+    {ok, _} = tcp_metrics_monitor:get_metrics().
 
 init_per_testcase(_, Config) ->
     application:set_env(tcp_metrics, interval_seconds, 1),

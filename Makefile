@@ -45,6 +45,11 @@ cover:
 edoc:
 	./rebar3 edoc
 
+purge:
+	find . -name *beam | xargs rm -rf
+
+vct:
+	./rebar3 ct --readable=false
 ##
 ## Release targets
 ##
