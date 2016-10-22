@@ -197,8 +197,28 @@ handle_bad_socket_test_() ->
 
 normal_socket_test_() ->
     {ok, Family} = get_family(),
-    {ok, Socket} = procket:socket(netlink, dgram, ?NETLINK_GENERIC),
-    [?_assertEqual(true, 0 =< length(get_metrics_from_socket(Family, {ok, Socket})))].
+    {ok, Socket} = procket:socket(inet6, stream, tcp),
+    SA = list_to_binary([procket:sockaddr_common(inet6, 128), <<0:16/integer-unsigned-big, 0:((128 - (2+2))*8)>>]),
+    ok = procket:bind(Socket, SA),
+    {Sz, RA} = procket:getsockname(Socket, SA),
+    io:format("listen address ~p ~p\n", [Sz,RA]),
+    ok = procket:listen(Socket, 1),
+    {ok, Send} = procket:socket(inet6, stream, tcp),
+    procket:connect(Send, RA),
+    {ok, Recv} = procket:accept(Socket),
+    Attrs = [{d_addr,{54,192,147,29}},
+             {s_addr,{10,0,79,182}},
+             {age_ms,806101408},
+             {vals,[{rtt_us,47313},
+                    {rtt_ms,47},
+                    {rtt_var_us,23656},
+                    {rtt_var_ms,23},
+                    {cwnd,10}]}],
+    Msg = [{netlink,tcp_metrics, [multi], 18,31595, {get,1,0,Attrs}}],
+    Buf = netlink_codec:nl_enc(Family, Msg),
+    io:format("message ~p\n", [Buf]),
+    procket:sendto(Send, Buf),
+    [?_assertEqual([Msg], get_metrics_from_socket(Family, {ok, Recv}))].
 
 handle_alredy_found_ns_test_() ->
     [?_assertEqual(#{hello => world}, get_metrics_from_ns(1, "2", "net[213423]", world, #{hello => world}))].
