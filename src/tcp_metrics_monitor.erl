@@ -76,7 +76,6 @@ handle_info(poll_tcp_metrics, State = #state{family = Family}) ->
     Start = erlang:monotonic_time(micro_seconds),
     Metrics = get_metrics_from_proc(Family),
     End = erlang:monotonic_time(micro_seconds),
-    ct:pal("polling time ~p us", [End - Start]),
     erlang:send_after(splay_ms(), self(), poll_tcp_metrics),
     NewState = State#state{metrics = Metrics},
     {noreply, NewState};
@@ -148,7 +147,6 @@ get_metrics_from_ns(Family, {PidInt, _}, Map) ->
     PidStr = integer_to_list(PidInt),
     NetNs = "/proc/" ++ PidStr ++ "/ns/net",
     NetNsInfo = file:read_link_all(NetNs),
-    ct:pal("netnsinfo for ~p is ~p", [NetNs, NetNsInfo]),
     get_metrics_from_ns(Family, PidStr, NetNsInfo, Map).
 
 get_metrics_from_ns(Family, PidStr, {ok, NetNs}, Map) ->
@@ -156,7 +154,6 @@ get_metrics_from_ns(Family, PidStr, {ok, NetNs}, Map) ->
 get_metrics_from_ns(_Family, _PidStr, _, Map) -> Map.
 
 get_metrics_from_ns(Family, PidStr, NetNs, unknown, Map) ->
-    ct:pal("getting metrics for ~p", [NetNs]),
     Opts = [{family, netlink},
             {protocol, ?NETLINK_GENERIC},
             {type,dgram},
