@@ -24,9 +24,9 @@ test_get_metrics_ci(false) ->
     timer:sleep(2000),
     ct:pal("CI is ~p", [os:getenv("CI")]),
     {ok, Metrics} = tcp_metrics_monitor:get_metrics(),
-    [H | _] = maps:values(Metrics),
-    ct:pal("got values ~p", [length(maps:values(Metrics))]),
-    [#netlink{type = tcp_metrics} | _] = H;
+    [H | _] = Metrics,
+    ct:pal("got values ~p", [length(Metrics)]),
+    #netlink{type = tcp_metrics} = H;
 
 test_get_metrics_ci(_) ->
     timer:sleep(2000),
