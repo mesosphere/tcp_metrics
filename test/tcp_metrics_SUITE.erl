@@ -20,18 +20,25 @@ test_wait(_Config) -> timer:sleep(2000).
 
 test_get_metrics(_Config) -> test_get_metrics_ci(os:getenv("CI")).
 
+get_metrics() ->
+    ok = tcp_metrics_monitor:get_metrics(new),
+    receive
+        {new, New} ->
+            ct:pal("got ~p", [New]),
+            {ok, New}
+    end.
+
+
 test_get_metrics_ci(false) ->
-    timer:sleep(2000),
     ct:pal("CI is ~p", [os:getenv("CI")]),
-    {ok, Metrics} = tcp_metrics_monitor:get_metrics(),
+    {ok, Metrics} = get_metrics(),
     [H | _] = Metrics,
     ct:pal("got values ~p", [length(Metrics)]),
     #netlink{type = tcp_metrics} = H;
 
 test_get_metrics_ci(_) ->
-    timer:sleep(2000),
     ct:pal("CI is ~p", [os:getenv("CI")]),
-    {ok, _} = tcp_metrics_monitor:get_metrics().
+    {ok, _} = get_metrics().
 
 init_per_testcase(_, Config) ->
     application:set_env(tcp_metrics, interval_seconds, 1),

@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 -include_lib("gen_netlink/include/netlink.hrl").
 
--export([get_metrics/0]).
+-export([get_metrics/1]).
 -export([start_link/0]).
 
 -export([init/1,
@@ -24,12 +24,8 @@
 
 -define(SERVER, ?MODULE).
 
--type link_info() :: [#netlink{}].
--type metrics() :: link_info().
-
 -record(state, {
-        family :: integer(),
-        metrics = [] :: metrics()
+        family :: integer()
     }).
 
 -spec(start_link() ->
@@ -44,7 +40,6 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
     {ok, Family} = get_family(),
-    erlang:send_after(splay_ms(), self(), poll_tcp_metrics),
     {ok, #state{family = Family}}.
 
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
@@ -55,8 +50,6 @@ init([]) ->
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
     {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(get_metrics, _From, State) ->
-    {reply, {ok, State#state.metrics}, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
@@ -64,6 +57,10 @@ handle_call(_Request, _From, State) ->
     {noreply, NewState :: #state{}} |
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
+handle_cast({get_metrics, Atom, Pid}, State = #state{family = Family}) ->
+    Metrics = get_metrics_from_proc(Family),
+    {Atom, Metrics} = erlang:send(Pid, {Atom, Metrics}),
+    {noreply, State};
 handle_cast(_Request, State) ->
     {noreply, State}.
 
@@ -71,11 +68,6 @@ handle_cast(_Request, State) ->
     {noreply, NewState :: #state{}} |
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(poll_tcp_metrics, State = #state{family = Family}) ->
-    Metrics = get_metrics_from_proc(Family),
-    erlang:send_after(splay_ms(), self(), poll_tcp_metrics),
-    NewState = State#state{metrics = Metrics},
-    {noreply, NewState};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -110,8 +102,8 @@ get_family() ->
     {family_id, Family} = lists:keyfind(family_id, 1, Attrs),
     {ok, Family}.
 
--spec(get_metrics() -> {ok, metrics()} | {error, term()}).
-get_metrics() -> gen_server:call(?SERVER, get_metrics).
+-spec(get_metrics(atom()) -> ok | {error, term()}).
+get_metrics(Atom) -> gen_server:cast(?SERVER, {get_metrics, Atom, self()}).
 
 -spec(get_metrics_from_socket(integer(), {ok, integer()} | {error, term()}) -> [term()]).
 get_metrics_from_socket(Family, {ok, Socket}) ->
@@ -135,16 +127,6 @@ get_metrics_from_proc(Family) ->
             {type,dgram}],
     Socket = procket:open(0, Opts),
     get_metrics_from_socket(Family, Socket).
-
-%% TODO: borrowed from minuteman, should probably be a util somewhere
--spec(splay_ms() -> integer()).
-splay_ms() ->
-    MsPerMinute = tcp_metrics_config:interval_seconds() * 1000,
-    NextMinute = -1 * erlang:monotonic_time(milli_seconds) rem MsPerMinute,
-    SplayMS = tcp_metrics_config:splay_seconds() * 1000,
-    FlooredSplayMS = max(1, SplayMS),
-    Splay = rand:uniform(FlooredSplayMS),
-    NextMinute + Splay.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
