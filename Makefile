@@ -26,7 +26,7 @@ packageclean:
 ## Test targets
 ##
 
-check: test xref dialyzer cover edoc
+check: test xref dialyzer cover edoc rock
 
 test: ct eunit
 
@@ -50,6 +50,11 @@ purge:
 
 vct:
 	./rebar3 ct --readable=false
+
+rock:
+	./elvis rock
+
+#
 ##
 ## Release targets
 ##

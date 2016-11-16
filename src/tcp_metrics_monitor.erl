@@ -110,7 +110,7 @@ get_family() ->
     {family_id, Family} = lists:keyfind(family_id, 1, Attrs),
     {ok, Family}.
 
--spec(get_metrics() -> metrics()).
+-spec(get_metrics() -> {ok, metrics()} | {error, term()}).
 get_metrics() -> gen_server:call(?SERVER, get_metrics).
 
 -spec(get_metrics_from_socket(integer(), {ok, integer()} | {error, term()}) -> [term()]).
