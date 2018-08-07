@@ -1,8 +1,17 @@
 -module(tcp_metrics_SUITE).
--compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("gen_netlink/include/netlink.hrl").
+
+-export([
+    all/0,
+    init_per_testcase/2,
+    end_per_testcase/2,
+
+    test_gen_server/1,
+    test_wait/1,
+    test_get_metrics/1
+]).
 
 all() -> [test_gen_server,
           test_wait,
